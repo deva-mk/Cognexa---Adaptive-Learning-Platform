@@ -1,0 +1,18 @@
+# Render Blueprint: New -> Blueprint -> pick this repo. Public DEMO deployment (local auth + sample data).
+# Free instances have an ephemeral disk: data resets on redeploy/restart. For real use see docs/DEPLOYMENT.md.
+services:
+  - type: web
+    name: adaptive-learning
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - { key: ENVIRONMENT, value: development }   # 'production' requires Firebase; this is the demo profile
+      - { key: AUTH_MODE, value: local }
+      - { key: DEMO_MODE, value: "true" }
+      - { key: COOKIE_SECURE, value: "true" }
+      - { key: TRUSTED_PROXY_COUNT, value: "1" }
+      - { key: BLOCKCHAIN_ENABLED, value: "false" }
+      - { key: SERVE_FRONTEND, value: "true" }
+      - { key: DATA_DIR, value: /data }
+      - { key: OCR_LANGS, value: eng+hin+tam+kan+mal }

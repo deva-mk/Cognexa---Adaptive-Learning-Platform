@@ -1,0 +1,57 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-hin tesseract-ocr-tam tesseract-ocr-kan tesseract-ocr-mal fonts-noto-core
+      - run: pip install -r backend/requirements.txt pytest
+      - run: cd backend && python -m pytest -q
+  blockchain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: cd blockchain && npm ci && npx hardhat test
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: cd frontend && npm ci && npm run build
+  firebase-emulators:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r backend/requirements.txt
+      - name: Firestore security rules (emulator)
+        run: cd firestore-rules-test && npm install && npx firebase-tools emulators:exec --only firestore --project demo-adaptive "node rules.test.mjs"
+      - name: Firebase Authentication end-to-end (emulator)
+        run: |
+          npx firebase-tools emulators:start --only auth --project demo-adaptive &
+          for i in $(seq 1 40); do curl -s 127.0.0.1:9099 >/dev/null && break; sleep 2; done
+          python scripts/e2e_firebase_emulator.py
+  windows-scripts:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -Demo
+      - name: Start, run e2e, stop
+        shell: pwsh
+        run: |
+          Start-Process pwsh -ArgumentList "-File","scripts/start.ps1" -PassThru | Out-Null
+          for ($i=0; $i -lt 90; $i++) { try { Invoke-WebRequest http://localhost:8000/api/health -UseBasicParsing | Out-Null; break } catch { Start-Sleep 2 } }
+          backend\.venv\Scripts\python.exe scripts\e2e_live.py
